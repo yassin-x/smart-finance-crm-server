@@ -97,7 +97,7 @@ export class AuthService {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      domain: '.jokercore.pro',
+      domain: '.smartfinance-eg.com',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -106,7 +106,7 @@ export class AuthService {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      domain: '.jokercore.pro',
+      domain: '.smartfinance-eg.com',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -187,12 +187,20 @@ export class AuthService {
     try {
       const payload = await this.tokenService.verifyRefreshToken(refreshToken);
       const access_token = this.tokenService.generateAccessToken(payload);
+      reply.clearCookie('access_token', {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        domain: '.smartfinance-eg.com',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
       reply.setCookie('access_token', access_token, {
         path: '/',
         httpOnly: true,
         secure: true,
         sameSite: 'none',
-        domain: '.jokercore.pro',
+        domain: '.smartfinance-eg.com',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -209,7 +217,7 @@ export class AuthService {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      domain: '.jokercore.pro',
+      domain: '.smartfinance-eg.com',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     reply.clearCookie('refresh_token', {
@@ -217,7 +225,7 @@ export class AuthService {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      domain: '.jokercore.pro',
+      domain: '.smartfinance-eg.com',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
