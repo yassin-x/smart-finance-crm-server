@@ -63,12 +63,9 @@ export class LeadService {
   //     throw error;
   //   }
   // }
-
   async create(createLeadDto: CreateLeadDto) {
     const phoneExists = await this.prisma.lead.findUnique({
-      where: {
-        phone: createLeadDto.phone,
-      },
+      where: { phone: createLeadDto.phone },
     });
 
     if (phoneExists) {
@@ -76,9 +73,7 @@ export class LeadService {
     }
 
     const oldLeads = await this.prisma.phoneRegistry.findUnique({
-      where: {
-        phoneNumber: createLeadDto.phone,
-      },
+      where: { phoneNumber: createLeadDto.phone },
     });
 
     if (oldLeads) {
@@ -86,31 +81,27 @@ export class LeadService {
     }
 
     const template = await this.prisma.formTemplate.findUnique({
-      where: {
-        slug: createLeadDto.templateSlug,
-      },
-      include: {
-        questions: true,
-      },
+      where: { slug: createLeadDto.templateSlug },
+      include: { questions: true },
     });
 
     if (!template) {
       throw new NotFoundException('Template غير موجود');
     }
 
-    const answersMap: Record<string, any> = {};
     const errors: { field: string; message: string }[] = [];
 
-    // ✅ المابينج الصحيح باستخدام name
-    for (const a of createLeadDto.answers) {
-      if (a.name) {
-        answersMap[a.name] = a.answer;
-      }
-    }
+    // ✅ خزن array زي ما جاي من الفرونت
+    const answersArray = createLeadDto.answers.map((a) => ({
+      name: a.name,
+      question: a.question,
+      answer: a.answer,
+    }));
 
     // ✅ validation
     for (const q of template.questions) {
-      const value = answersMap[q.name];
+      const found = answersArray.find((a) => a.name === q.name);
+      const value = found?.answer;
 
       // required
       if (
@@ -154,8 +145,10 @@ export class LeadService {
           });
         }
 
-        // ✅ optional: خزنه كـ number فعلي
-        answersMap[q.name] = num;
+        // ✅ عدل القيمة جوه الـ array
+        if (found) {
+          found.answer = num;
+        }
       }
 
       // TEXT
@@ -181,7 +174,7 @@ export class LeadService {
         const submission = await tx.submission.create({
           data: {
             formTemplateSlug: createLeadDto.templateSlug,
-            answers: answersMap,
+            answers: answersArray, // ✅ ARRAY كامل بالـ label
           },
         });
 
