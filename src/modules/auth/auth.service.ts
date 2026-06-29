@@ -96,14 +96,12 @@ export class AuthService {
       path: '/',
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
     });
 
     reply.setCookie('refresh_token', refresh_token, {
       path: '/',
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
     });
 
     const updatedAccount = await this.prisma.account.update({
