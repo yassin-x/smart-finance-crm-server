@@ -91,28 +91,24 @@ export class LeadService {
 
     const errors: { field: string; message: string }[] = [];
 
-    // ✅ خزن array زي ما جاي من الفرونت
     const answersArray = createLeadDto.answers.map((a) => ({
       name: a.name,
       question: a.question,
       answer: a.answer,
     }));
 
-    // ✅ validation
     for (const q of template.questions) {
       const found = answersArray.find((a) => a.name === q.name);
       const value = found?.answer;
 
-      // required
       if (
         q.required &&
         (value === undefined || value === null || value === '')
       ) {
-        errors.push({
+        throw new BadRequestException({
           field: q.name,
           message: `${q.label} مطلوب`,
         });
-        continue;
       }
 
       if (value === undefined || value === null || value === '') continue;
@@ -122,11 +118,10 @@ export class LeadService {
         const num = Number(value);
 
         if (isNaN(num)) {
-          errors.push({
+          throw new BadRequestException({
             field: q.name,
             message: `${q.label} لازم يكون رقم`,
           });
-          continue;
         }
 
         const rules = q.rules as { min?: number; max?: number } | null;
@@ -145,18 +140,26 @@ export class LeadService {
           });
         }
 
-        // ✅ عدل القيمة جوه الـ array
         if (found) {
           found.answer = num;
         }
       }
 
-      // TEXT
       if (q.type === 'TEXT') {
         if (typeof value !== 'string') {
           errors.push({
             field: q.name,
             message: `${q.label} لازم يكون نص`,
+          });
+        }
+      }
+
+      console.log(q.name);
+      if (q.name === 'contractDate') {
+        if (value === 'no') {
+          throw new BadRequestException({
+            field: q.name,
+            message: `يجب ان يمر سنة علي تاريخ تعاقد`,
           });
         }
       }
