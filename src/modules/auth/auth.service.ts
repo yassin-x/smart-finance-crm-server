@@ -190,8 +190,10 @@ export class AuthService {
       reply.setCookie('access_token', access_token, {
         path: '/',
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: true,
+        sameSite: 'none',
+        domain: '.jokercore.pro',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       return { message: 'تم تجديد الاتصال بنجاح' };
@@ -205,14 +207,18 @@ export class AuthService {
     reply.clearCookie('access_token', {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: true,
+      sameSite: 'none',
+      domain: '.jokercore.pro',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     reply.clearCookie('refresh_token', {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: true,
+      sameSite: 'none',
+      domain: '.jokercore.pro',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return { message: 'تم تسجيل الخروج بنجاح' };
