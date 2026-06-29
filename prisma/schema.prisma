@@ -1,0 +1,129 @@
+// Production-ready schema for a form builder + analytics platform.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum FieldType {
+  TEXT
+  EMAIL
+  NUMBER
+  CHECKBOX
+  RADIO
+  TEXTAREA
+  DATE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  AFTER
+  REJECTED
+  ACEPTED
+}
+
+model Account {
+  id                  String    @id @default(uuid())
+  username            String    @unique
+  email               String    @unique
+  password            String
+  isVerified          Boolean   @default(false)
+  verifyCode          String?
+  verifyCodeExpiresAt DateTime?
+
+  fullName String
+  phone    String?
+  role     UserRole @default(USER)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([createdAt, username, email])
+}
+
+model Lead {
+  id String @id @default(uuid())
+
+  name   String
+  job    String
+  phone  String     @unique
+  note   String?
+  status LeadStatus @default(NEW)
+
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone, createdAt])
+}
+
+model FormTemplate {
+  id       String  @id @default(uuid())
+  title    String
+  desc     String
+  slug     String  @unique
+  isActive Boolean @default(true)
+  rules    Json?
+
+  questions  FormQuestions[]
+  submitions Submission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug, createdAt])
+}
+
+model FormQuestions {
+  id String @id @default(uuid())
+
+  label String
+  desc  String
+  name  String    @unique
+  type  FieldType
+
+  placeholder String?
+  required    Boolean @default(true)
+  rules       Json?
+
+  order Int
+
+  formTemplateId String
+  formTemplate   FormTemplate @relation(fields: [formTemplateId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([formTemplateId, createdAt])
+}
+
+model Submission {
+  id String @id @default(uuid())
+
+  formTemplateSlug String
+  formTemplate     FormTemplate @relation(fields: [formTemplateSlug], references: [slug], onDelete: Cascade)
+
+  answers Json
+
+  lead Lead?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([formTemplateSlug, createdAt])
+}
+
+model PhoneRegistry {
+  id          String @id @default(uuid())
+  phoneNumber String @unique
+}
