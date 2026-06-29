@@ -101,23 +101,18 @@ export class LeadService {
     const answersMap: Record<string, any> = {};
     const errors: { field: string; message: string }[] = [];
 
-    const labelToName = new Map<string, string>();
-    for (const q of template.questions) {
-      labelToName.set(q.label, q.name);
-    }
-
+    // ✅ المابينج الصحيح باستخدام name
     for (const a of createLeadDto.answers) {
-      const key = labelToName.get(a.question);
-
-      if (key) {
-        answersMap[key] = a.answer;
+      if (a.name) {
+        answersMap[a.name] = a.answer;
       }
     }
 
+    // ✅ validation
     for (const q of template.questions) {
       const value = answersMap[q.name];
 
-      // required check
+      // required
       if (
         q.required &&
         (value === undefined || value === null || value === '')
@@ -131,6 +126,7 @@ export class LeadService {
 
       if (value === undefined || value === null || value === '') continue;
 
+      // NUMBER
       if (q.type === 'NUMBER') {
         const num = Number(value);
 
@@ -141,6 +137,7 @@ export class LeadService {
           });
           continue;
         }
+
         const rules = q.rules as { min?: number; max?: number } | null;
 
         if (rules?.min !== undefined && num < rules.min) {
@@ -156,8 +153,12 @@ export class LeadService {
             message: `${q.label} لازم يكون ≤ ${rules.max}`,
           });
         }
+
+        // ✅ optional: خزنه كـ number فعلي
+        answersMap[q.name] = num;
       }
 
+      // TEXT
       if (q.type === 'TEXT') {
         if (typeof value !== 'string') {
           errors.push({
