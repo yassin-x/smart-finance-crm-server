@@ -70,7 +70,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4000',
+    origin: process.env.CORS_ORIGIN,
     credentials: true,
   });
 
