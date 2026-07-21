@@ -111,6 +111,9 @@ export class TemplateService {
     }
 
     const templates = await this.prisma.formTemplate.findMany({
+      where: {
+        isActive: true,
+      }, 
       include: {
         questions: true,
       },
