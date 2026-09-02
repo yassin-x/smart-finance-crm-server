@@ -234,7 +234,7 @@ export class LeadService {
   }
 
   async findAllLeads() {
-          this.prisma.lead.findMany({});
+     const leads = await this.prisma.lead.findMany({});
 
     return {
       data: leads,
