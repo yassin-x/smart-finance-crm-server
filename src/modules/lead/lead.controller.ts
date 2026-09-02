@@ -22,6 +22,13 @@ export class LeadController {
     return await this.leadService.create(createLeadDto);
   }
 
+
+  @Get()
+  async findAll(
+  ) {
+    return await this.leadService.findAllLeads();
+  }
+
   @UseGuards(AuthGuard)
   @Get()
   async findAll(
