@@ -24,7 +24,7 @@ export class LeadController {
 
 
   @Get("all")
-  async findAll(
+  async findAllLeads(
   ) {
     return await this.leadService.findAllLeads();
   }
