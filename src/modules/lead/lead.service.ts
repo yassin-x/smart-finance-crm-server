@@ -238,11 +238,6 @@ export class LeadService {
 
     return {
       data: leads,
-      meta: {
-        total,
-        pages,
-        lastPage: Math.ceil(total / limits),
-      },
     };
   }
 }
