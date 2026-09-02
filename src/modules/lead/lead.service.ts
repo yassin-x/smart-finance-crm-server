@@ -232,4 +232,17 @@ export class LeadService {
       },
     };
   }
+
+  async findAllLeads() {
+          this.prisma.lead.findMany({});
+
+    return {
+      data: leads,
+      meta: {
+        total,
+        pages,
+        lastPage: Math.ceil(total / limits),
+      },
+    };
+  }
 }
