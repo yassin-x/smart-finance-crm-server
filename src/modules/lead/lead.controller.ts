@@ -23,7 +23,7 @@ export class LeadController {
   }
 
 
-  @Get()
+  @Get("all")
   async findAll(
   ) {
     return await this.leadService.findAllLeads();
