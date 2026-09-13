@@ -18,7 +18,7 @@ export class TemplateController {
     return await this.templateService.findAll();
   }
 
-  @Get(':slug')
+  @Get('one/:slug')
   async findOne(@Param('slug') slug: string) {
     return await this.templateService.findOne(slug);
   }
