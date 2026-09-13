@@ -81,6 +81,9 @@ async function bootstrap() {
     }),
   );
 
+  console.log('BOOT: init');
+
   await app.listen(process.env.PORT ?? 3000);
+  console.log('BOOT: listening');
 }
 await bootstrap();
