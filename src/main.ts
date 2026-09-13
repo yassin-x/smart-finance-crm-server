@@ -60,10 +60,9 @@ async function bootstrap() {
   });
   await app.register(fastifyCsrf);
 
-  const corsOrigins = JSON.parse(process.env.CORS_ORIGINS ?? '[]');
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: process.env.CORS_ORIGINS,
     credentials: true,
   });
 
