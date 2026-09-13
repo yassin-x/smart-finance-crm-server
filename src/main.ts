@@ -60,11 +60,6 @@ async function bootstrap() {
   });
   await app.register(fastifyCsrf);
 
-  await app.register(fastifyStatic, {
-    root: `${__dirname}/public`,
-    prefix: '/public/',
-  });
-
   app.enableCors({
     origin: process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()),
     credentials: true,
@@ -76,9 +71,6 @@ async function bootstrap() {
     }),
   );
 
-  console.log('BOOT: init');
-
   await app.listen(process.env.PORT ?? 3000);
-  console.log('BOOT: listening');
 }
-await bootstrap();
+bootstrap();
