@@ -4,33 +4,72 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import helmet from '@fastify/helmet';
+import { fastifyHelmet } from '@fastify/helmet';
 import fastifyCsrf from '@fastify/csrf-protection';
 import fastifyCookie from '@fastify/cookie';
 import compression from '@fastify/compress';
 import secureSession from '@fastify/secure-session';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
+import fastifyStatic from '@fastify/static';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({
+      trustProxy: true,
+      logger: true,
+    }),
     {
       logger: ['error', 'warn', 'log', 'debug', 'verbose'],
     },
   );
 
-  await app.register(helmet);
-  await app.register(fastifyCsrf);
   await app.register(fastifyCookie, {
     secret: process.env.COOKIE_SIGNATURE_SECRET,
   });
+  await app.register(compression);
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: [`'self'`, 'unpkg.com'],
+        styleSrc: [
+          `'self'`,
+          `'unsafe-inline'`,
+          'cdn.jsdelivr.net',
+          'fonts.googleapis.com',
+          'unpkg.com',
+        ],
+        fontSrc: [`'self'`, 'fonts.gstatic.com', 'data:'],
+        imgSrc: [`'self'`, 'data:', 'cdn.jsdelivr.net', 'https:'],
+        scriptSrc: [
+          `'self'`,
+          `https: 'unsafe-inline'`,
+          `cdn.jsdelivr.net`,
+          `'unsafe-eval'`,
+        ],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: { action: 'deny' },
+    noSniff: true,
+    xssFilter: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  });
+  await app.register(fastifyCsrf);
+
+  await app.register(fastifyStatic, {
+    root: `${__dirname}/public`,
+    prefix: '/public/',
+  });
+
   app.enableCors({
     origin: process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()),
-    optionsSuccessStatus: 204,
     credentials: true,
   });
-  await app.register(compression);
   await app.register(secureSession, {
     secret: process.env.SESSION_SECRET!,
     salt: Buffer.from(process.env.SESSION_SALT!, 'hex'),
