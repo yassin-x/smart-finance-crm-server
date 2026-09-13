@@ -8,7 +8,6 @@ import { fastifyHelmet } from '@fastify/helmet';
 import fastifyCsrf from '@fastify/csrf-protection';
 import fastifyCookie from '@fastify/cookie';
 import compression from '@fastify/compress';
-import secureSession from '@fastify/secure-session';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import fastifyStatic from '@fastify/static';
 
@@ -69,10 +68,6 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()),
     credentials: true,
-  });
-  await app.register(secureSession, {
-    secret: process.env.SESSION_SECRET!,
-    salt: Buffer.from(process.env.SESSION_SALT!, 'hex'),
   });
 
   app.useGlobalPipes(
