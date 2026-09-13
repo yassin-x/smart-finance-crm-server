@@ -1,15 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateTemplateDto } from './dto/create-template.dto';
-import { FieldType } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { InjectRedis } from '../redis/decorator/redis.decorator';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { InjectRedisClient } from '../redis/decorator/redis.decorator.js';
+import { CreateTemplateDto } from './dto/create-template.dto.js';
+import { FieldType } from '../../generated/prisma/enums.js';
 
 @Injectable()
 export class TemplateService {
   constructor(
     private prisma: PrismaService,
-    @InjectRedis() private readonly redis: Redis,
+    @InjectRedisClient() private readonly redis: Redis,
   ) {}
 
   async create(createTemplateDto: CreateTemplateDto) {
@@ -113,6 +113,9 @@ export class TemplateService {
     const templates = await this.prisma.formTemplate.findMany({
       include: {
         questions: true,
+      },
+      where: {
+        isActive: true,
       },
     });
 

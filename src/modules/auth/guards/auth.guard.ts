@@ -4,22 +4,22 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InjectRedis } from '../../redis/decorator/redis.decorator';
-import Redis from 'ioredis';
-import { PrismaService } from '../../prisma/prisma.service';
-import { TokenService } from '../stratgies/token.service';
+import { Redis } from 'ioredis';
+import { InjectRedisClient } from '../../redis/decorator/redis.decorator.js';
+import { TokenService } from '../stratgies/token.service.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    @InjectRedis() private readonly redis: Redis,
+    @InjectRedisClient() private readonly redis: Redis,
     private tokenService: TokenService,
     private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const access_token = request.cookies['access_token'];
+    const access_token = request.cookies['accessToken'];
 
     if (!access_token) {
       throw new UnauthorizedException('لم يتم تسجيل الدخول!');

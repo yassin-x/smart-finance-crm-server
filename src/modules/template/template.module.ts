@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TemplateService } from './template.service';
-import { TemplateController } from './template.controller';
-import { AuthModule } from '../auth/auth.module';
+import { AuthModule } from '../auth/auth.module.js';
+import { TemplateController } from './template.controller.js';
+import { TemplateService } from './template.service.js';
+
 
 @Module({
   imports: [AuthModule],

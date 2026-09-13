@@ -1,30 +1,8 @@
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'USER');
+CREATE TYPE "FieldType" AS ENUM ('TEXT', 'EMAIL', 'NUMBER', 'CHECKBOX', 'RADIO', 'TEXTAREA', 'DATE');
 
 -- CreateEnum
-CREATE TYPE "FieldType" AS ENUM ('TEXT', 'EMAIL', 'NUMBER', 'SELECT', 'CHECKBOX', 'RADIO', 'TEXTAREA', 'DATE');
-
--- CreateEnum
-CREATE TYPE "LeadStute" AS ENUM ('NEW', 'CONTACTED', 'AFTER', 'REJECTED', 'ACEPTED');
-
--- CreateTable
-CREATE TABLE "Account" (
-    "id" TEXT NOT NULL,
-    "username" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
-    "isVerified" BOOLEAN NOT NULL DEFAULT false,
-    "verifyCode" TEXT,
-    "verifyCodeExpiresAt" TIMESTAMP(3),
-    "fullName" TEXT NOT NULL,
-    "phone" TEXT,
-    "role" "UserRole" NOT NULL DEFAULT 'USER',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "Account_pkey" PRIMARY KEY ("id")
-);
+CREATE TYPE "LeadStatus" AS ENUM ('NEW', 'CONTACTED', 'AFTER', 'REJECTED', 'ACEPTED', 'QUALIFIED');
 
 -- CreateTable
 CREATE TABLE "Lead" (
@@ -33,7 +11,7 @@ CREATE TABLE "Lead" (
     "job" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "note" TEXT,
-    "status" "LeadStute" NOT NULL DEFAULT 'NEW',
+    "status" "LeadStatus" NOT NULL DEFAULT 'NEW',
     "submissionId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -59,11 +37,12 @@ CREATE TABLE "FormTemplate" (
 CREATE TABLE "FormQuestions" (
     "id" TEXT NOT NULL,
     "label" TEXT NOT NULL,
+    "desc" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "type" "FieldType" NOT NULL,
     "placeholder" TEXT,
     "required" BOOLEAN NOT NULL DEFAULT true,
-    "options" JSONB,
+    "rules" JSONB,
     "order" INTEGER NOT NULL,
     "formTemplateId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -74,7 +53,7 @@ CREATE TABLE "FormQuestions" (
 -- CreateTable
 CREATE TABLE "Submission" (
     "id" TEXT NOT NULL,
-    "formTemplateId" TEXT NOT NULL,
+    "formTemplateSlug" TEXT NOT NULL,
     "answers" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -89,15 +68,6 @@ CREATE TABLE "PhoneRegistry" (
 
     CONSTRAINT "PhoneRegistry_pkey" PRIMARY KEY ("id")
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "Account_username_key" ON "Account"("username");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Account_email_key" ON "Account"("email");
-
--- CreateIndex
-CREATE INDEX "Account_createdAt_username_email_idx" ON "Account"("createdAt", "username", "email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Lead_phone_key" ON "Lead"("phone");
@@ -115,10 +85,13 @@ CREATE UNIQUE INDEX "FormTemplate_slug_key" ON "FormTemplate"("slug");
 CREATE INDEX "FormTemplate_slug_createdAt_idx" ON "FormTemplate"("slug", "createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "FormQuestions_name_key" ON "FormQuestions"("name");
+
+-- CreateIndex
 CREATE INDEX "FormQuestions_formTemplateId_createdAt_idx" ON "FormQuestions"("formTemplateId", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "Submission_formTemplateId_createdAt_idx" ON "Submission"("formTemplateId", "createdAt");
+CREATE INDEX "Submission_formTemplateSlug_createdAt_idx" ON "Submission"("formTemplateSlug", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PhoneRegistry_phoneNumber_key" ON "PhoneRegistry"("phoneNumber");
@@ -130,4 +103,4 @@ ALTER TABLE "Lead" ADD CONSTRAINT "Lead_submissionId_fkey" FOREIGN KEY ("submiss
 ALTER TABLE "FormQuestions" ADD CONSTRAINT "FormQuestions_formTemplateId_fkey" FOREIGN KEY ("formTemplateId") REFERENCES "FormTemplate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Submission" ADD CONSTRAINT "Submission_formTemplateId_fkey" FOREIGN KEY ("formTemplateId") REFERENCES "FormTemplate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Submission" ADD CONSTRAINT "Submission_formTemplateSlug_fkey" FOREIGN KEY ("formTemplateSlug") REFERENCES "FormTemplate"("slug") ON DELETE CASCADE ON UPDATE CASCADE;

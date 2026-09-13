@@ -3,17 +3,12 @@ import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class TokenService {
-  constructor(
-    private jwt: JwtService,
-  ) {}
+  constructor(private jwt: JwtService) {}
 
   generateAccessToken(payload: { userId: string }) {
     return this.jwt.sign(
       { ...payload },
-      {
-        secret: process.env.JWT_ACCESS_SECRET,
-        expiresIn: '15m',
-      },
+      { expiresIn: '1d', secret: process.env.JWT_ACCESS_SECRET },
     );
   }
 

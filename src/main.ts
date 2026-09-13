@@ -1,100 +1,47 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module.js';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { fastifyHelmet } from '@fastify/helmet';
+import helmet from '@fastify/helmet';
 import fastifyCsrf from '@fastify/csrf-protection';
-import fastifyStatic from '@fastify/static';
 import fastifyCookie from '@fastify/cookie';
 import compression from '@fastify/compress';
-import { ValidationPipe } from '@nestjs/common';
+import secureSession from '@fastify/secure-session';
+import { StandardSchemaValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({
-      trustProxy: true,
-      logger: true,
-    }),
+    new FastifyAdapter(),
     {
-      snapshot: true,
-      abortOnError: true,
+      logger: ['error', 'warn', 'log', 'debug', 'verbose'],
     },
   );
-  await app.register(fastifyCookie, {
-    secret: process.env.COOKIE_SECRET,
-  });
 
-  await app.register(compression);
-
-  await app.register(fastifyHelmet, {
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: [`'self'`, 'unpkg.com'],
-        styleSrc: [
-          `'self'`,
-          `'unsafe-inline'`,
-          'cdn.jsdelivr.net',
-          'fonts.googleapis.com',
-          'unpkg.com',
-        ],
-        fontSrc: [`'self'`, 'fonts.gstatic.com', 'data:'],
-        imgSrc: [`'self'`, 'data:', 'cdn.jsdelivr.net', 'https:'],
-        scriptSrc: [
-          `'self'`,
-          `https: 'unsafe-inline'`,
-          `cdn.jsdelivr.net`,
-          `'unsafe-eval'`,
-        ],
-      },
-    },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
-    frameguard: { action: 'deny' },
-    noSniff: true,
-    xssFilter: true,
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  });
-
+  await app.register(helmet);
   await app.register(fastifyCsrf);
-
-  await app.register(fastifyStatic, {
-    root: `${__dirname}/public`,
-    prefix: '/public/',
+  await app.register(fastifyCookie, {
+    secret: process.env.COOKIE_SIGNATURE_SECRET,
   });
-
   app.enableCors({
-    origin: process.env.CORS_ORIGIN,
+    origin: process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()),
+    optionsSuccessStatus: 204,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  });
+  await app.register(compression);
+  await app.register(secureSession, {
+    secret: process.env.SESSION_SECRET!,
+    salt: Buffer.from(process.env.SESSION_SALT!, 'hex'),
   });
 
   app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
+    new StandardSchemaValidationPipe({
       transform: true,
-      forbidNonWhitelisted: true,
     }),
   );
 
-  const config = new DocumentBuilder()
-    .setTitle('My API')
-    .setDescription('API Documentation')
-    .setVersion('1.0')
-    // .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-
-  SwaggerModule.setup('docs', app, document);
-
-  await app.listen(process.env.PORT ?? 3001);
+  await app.listen(process.env.PORT ?? 3000);
 }
-
-bootstrap();
+await bootstrap();

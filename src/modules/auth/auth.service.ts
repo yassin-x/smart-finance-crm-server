@@ -1,244 +1,218 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import Redis from 'ioredis';
-import { InjectRedis } from '../redis/decorator/redis.decorator';
-import { FastifyReply, FastifyRequest } from 'fastify';
-import { CreateAccountDto } from './dto/createAccount.dto';
-import { PrismaService } from '../prisma/prisma.service';
-import bcrypt from 'bcrypt';
-import { UserRole } from '@prisma/client';
-import { SignInDTO } from './dto/signIn.dto';
-import { TokenService } from './stratgies/token.service';
-import { VerifyEmailDto } from './dto/verifyEmail.dto';
-import { MailService } from '../mail/mail.service';
-import { verifyEmailTemplate } from '../../mails/mail.message';
-
+import { Injectable } from '@nestjs/common';
+import { InjectRedisClient } from '../redis/decorator/redis.decorator.js';
+import { Redis } from 'ioredis';
+import { PrismaService } from '../prisma/prisma.service.js';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import * as argon2 from 'argon2';
+import { TokenService } from './stratgies/token.service.js';
+import { LoginDto } from './dto/login.dto.js';
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRedis() private readonly redis: Redis,
-    private prisma: PrismaService,
+    @InjectRedisClient() private readonly redis: Redis,
+    private readonly prisma: PrismaService,
     private tokenService: TokenService,
-    private mailService: MailService,
   ) {}
 
-  async createAccount(reply: FastifyReply, createAccountDto: CreateAccountDto) {
-    const existing = await this.prisma.account.findFirst({
-      where: {
-        OR: [
-          { email: createAccountDto.email },
-          { username: createAccountDto.username },
-        ],
-      },
-    });
-    if (existing) {
-      if (existing.email === createAccountDto.email) {
-        throw new BadRequestException('البريد الالكتروني مستخدم بلفعل!');
-      }
+  // async createAccount(reply: FastifyReply, createAccountDto: CreateAccountDto) {
+  //   const { email, username, password, fullName } = createAccountDto;
+  //   const existingUser = await this.prisma.account.findFirst({
+  //     where: {
+  //       OR: [{ email }, { username }],
+  //     },
+  //   });
 
-      if (existing.username === createAccountDto.username) {
-        throw new BadRequestException('اسم المستخدم مستخدم بلفعل!');
-      }
+  //   if (existingUser) {
+  //     return reply.status(400).send({
+  //       status: 'error',
+  //       data: {
+  //         message: 'Email or username already exists',
+  //       },
+  //     });
+  //   }
+
+  //   const hashedPassword = await argon2.hash(password);
+
+  //   const newUser = await this.prisma.account.create({
+  //     data: {
+  //       email,
+  //       username,
+  //       password: hashedPassword,
+  //       fullName,
+  //     },
+  //   });
+
+  //   return reply.status(201).send({
+  //     status: 'success',
+  //     data: {
+  //       id: newUser.id,
+  //       email: newUser.email,
+  //       username: newUser.username,
+  //       fullName: newUser.fullName,
+  //     },
+  //   });
+  // }
+
+  async me(reply: FastifyReply, req: FastifyRequest) {
+    const accessToken = req.cookies.accessToken;
+
+    if (!accessToken) {
+      return reply.status(401).send({
+        status: 'error',
+        data: {
+          message: 'Unauthorized',
+        },
+      });
     }
 
-    const passwordHashed = await bcrypt.hash(createAccountDto.password, 12);
+    const payload = await this.tokenService.verifyAccessToken(accessToken);
 
-    const account = await this.prisma.account.create({
-      data: {
-        email: createAccountDto.email,
-        username: createAccountDto.username,
-        password: passwordHashed,
-        fullName: createAccountDto.fullName,
-        phone: createAccountDto.phoneNumber,
-        role: createAccountDto.role as UserRole,
-      },
+    if (!payload) {
+      return reply.status(401).send({
+        status: 'error',
+        data: {
+          message: 'Unauthorized',
+        },
+      });
+    }
+
+    const user = await this.prisma.account.findUnique({
+      where: { id: payload.userId },
     });
 
-    await this.redis.set(`user:${account.id}`, JSON.stringify(account));
     return {
-      message: 'تم إنشاء الحساب بنجاح',
-      data: {
-        ...account,
-        password: undefined,
-      },
+      status: 'success',
+      data: user,
     };
   }
 
-  async signIn(reply: FastifyReply, signInDto: SignInDTO) {
-    const account = await this.prisma.account.findUnique({
-      where: {
-        email: signInDto.email,
-      },
+  async login(reply: FastifyReply, loginDto: LoginDto) {
+    const { username, password } = loginDto;
+
+    const user = await this.prisma.account.findFirst({
+      where: { username },
     });
-    if (!account) {
-      throw new BadRequestException('البريد الالكتروني غير صحيح!');
+
+    if (!user) {
+      return reply.status(400).send({
+        status: 'error',
+        data: {
+          message: 'Invalid username or password',
+        },
+      });
     }
 
-    const isPasswordMatch = await bcrypt.compare(
-      signInDto.password,
-      account.password,
-    );
-    if (!isPasswordMatch) {
-      throw new BadRequestException('كلمة المرور غير صحيحة!');
+    const isPasswordValid = await argon2.verify(user.password, password);
+
+    if (!isPasswordValid) {
+      return reply.status(400).send({
+        status: 'error',
+        data: {
+          message: 'Invalid username or password',
+        },
+      });
     }
 
-    const generateOTPCode = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
-
-    const access_token = this.tokenService.generateAccessToken({
-      userId: account.id,
+    const accessToken = this.tokenService.generateAccessToken({
+      userId: user.id,
     });
-    const refresh_token = this.tokenService.generateRefreshToken({
-      userId: account.id,
+    const refreshToken = this.tokenService.generateRefreshToken({
+      userId: user.id,
     });
 
-    reply.setCookie('access_token', access_token, {
+    reply.cookie('accessToken', accessToken, {
+      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
       path: '/',
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      domain: '.smartfinance-eg.com',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
 
-    reply.setCookie('refresh_token', refresh_token, {
+    reply.cookie('refreshToken', refreshToken, {
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       path: '/',
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      domain: '.smartfinance-eg.com',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
 
-    const updatedAccount = await this.prisma.account.update({
-      where: {
-        id: account.id,
-      },
+    return reply.status(200).send({
+      status: 'success',
       data: {
-        verifyCode: generateOTPCode,
-        verifyCodeExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        ...user,
       },
     });
-
-    this.mailService.sendMail(
-      account.email,
-      'كود التحقق',
-      verifyEmailTemplate(account.email, generateOTPCode),
-    );
-
-    await this.redis.set(`user:${account.id}`, JSON.stringify(updatedAccount));
-    return {
-      message: 'تم تسجيل الدخول بنجاح',
-      data: {
-        ...updatedAccount,
-        password: undefined,
-      },
-    };
   }
 
-  async verifyEmail(req: FastifyRequest, verifyEmailDto: VerifyEmailDto) {
-    console.log(req.user);
-    const account = await this.prisma.account.findUnique({
-      where: {
-        email: req.user?.email,
-      },
-    });
-    if (!account) {
-      throw new BadRequestException('البريد الالكتروني غير صحيح!');
-    }
-
-    if (account.verifyCode !== verifyEmailDto.code) {
-      throw new BadRequestException('كود التحقق غير صحيح!');
-    }
-    if (
-      account.verifyCodeExpiresAt &&
-      account.verifyCodeExpiresAt < new Date()
-    ) {
-      throw new BadRequestException('تم انتهاء صلاحية كود التحقق!');
-    }
-
-    const updatedAccount = await this.prisma.account.update({
-      where: {
-        id: account.id,
-      },
-      data: {
-        isVerified: true,
-        verifyCode: null,
-        verifyCodeExpiresAt: null,
-      },
-    });
-    await this.redis.set(`user:${account.id}`, JSON.stringify(updatedAccount));
-    return {
-      message: 'تم التحقق بنجاح',
-      data: {
-        ...updatedAccount,
-        password: undefined,
-      },
-    };
-  }
-
-  async refreshToken(req: FastifyRequest, reply: FastifyReply) {
-    const refreshToken = req.cookies['refresh_token'];
-
+  async refreshToken(reply: FastifyReply, req: FastifyRequest) {
+    const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
-      throw new BadRequestException('الرجاء تسجيل الدخول اولا');
+      return reply.status(401).send({
+        status: 'error',
+        data: {
+          message: 'Unauthorized',
+        },
+      });
     }
 
-    try {
-      const payload = await this.tokenService.verifyRefreshToken(refreshToken);
-      const access_token = this.tokenService.generateAccessToken(payload);
-      reply.clearCookie('access_token', {
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        domain: '.smartfinance-eg.com',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-      reply.setCookie('access_token', access_token, {
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        domain: '.smartfinance-eg.com',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+    const payload = await this.tokenService.verifyRefreshToken(refreshToken);
 
-      return { message: 'تم تجديد الاتصال بنجاح' };
-    } catch (error) {
-      console.log(error);
-      throw new BadRequestException('الرجاء تسجيل الدخول اولا');
+    if (!payload) {
+      return reply.status(401).send({
+        status: 'error',
+        data: {
+          message: 'Unauthorized',
+        },
+      });
     }
-  }
 
-  async signOut(reply: FastifyReply) {
-    reply.clearCookie('access_token', {
+    const accessToken = this.tokenService.generateAccessToken(payload);
+
+    reply.clearCookie('accessToken', {
+      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
       path: '/',
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      domain: '.smartfinance-eg.com',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
-    reply.clearCookie('refresh_token', {
+
+    reply.cookie('accessToken', accessToken, {
+      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
       path: '/',
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      domain: '.smartfinance-eg.com',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
 
-    return { message: 'تم تسجيل الخروج بنجاح' };
+    return reply.status(200).send({
+      status: 'success',
+      data: {
+        accessToken,
+      },
+    });
   }
 
-  async me(req: FastifyRequest) {
-    const account = req.user;
+  async logout(reply: FastifyReply) {
+    reply.clearCookie('accessToken', {
+      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+    reply.clearCookie('refreshToken', {
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
 
-    if (!account) {
-      throw new BadRequestException('الرجاء تسجيل الدخول اولا');
-    }
-
-    return account;
+    return reply.status(200).send({
+      status: 'success',
+      data: {
+        message: 'Logout successful',
+      },
+    });
   }
 }

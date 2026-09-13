@@ -1,18 +1,16 @@
-import { FieldType } from '@prisma/client';
 import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
-  IsJSON,
-  IsNumber,
   IsObject,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { FieldType } from '../../../generated/prisma/enums.js';
 
 export class CreateTemplateDto {
   @IsString({ message: 'يجب أن يكون العنوان حروف' })

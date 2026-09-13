@@ -4,65 +4,27 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateLeadDto } from './dto/create-lead.dto';
-import { PrismaService } from '../prisma/prisma.service';
-import { InjectRedis } from '../redis/decorator/redis.decorator';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
+import { InjectRedisClient } from '../redis/decorator/redis.decorator.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateLeadDto } from './dto/create-lead.dto.js';
+import { FastifyReply, FastifyRequest } from 'fastify';
+import * as XLSX from 'xlsx';
+import { UpdateStatusDto } from './dto/update-status.dto.js';
+import { LeadStatus } from '../../generated/prisma/enums.js';
+
+enum ExportFileExtension {
+  XLSX = 'xlsx',
+  CSV = 'csv',
+}
 
 @Injectable()
 export class LeadService {
   constructor(
     private prisma: PrismaService,
-    @InjectRedis() private redis: Redis,
+    @InjectRedisClient() private redis: Redis,
   ) {}
 
-  // async create(createLeadDto: CreateLeadDto) {
-  //   const phoneExited = await this.prisma.lead.findUnique({
-  //     where: {
-  //       phone: createLeadDto.phone,
-  //     },
-  //   });
-  //   if (phoneExited) {
-  //     throw new ConflictException('تم التسجيل مسبقًا بهذا الرقم');
-  //   }
-  //   const oldLeads = await this.prisma.phoneRegistry.findUnique({
-  //     where: {
-  //       phoneNumber: createLeadDto.phone,
-  //     },
-  //   });
-  //   if (oldLeads) {
-  //     throw new ConflictException('تم التسجيل مسبقًا بهذا الرقم');
-  //   }
-
-  //   try {
-  //     const result = await this.prisma.$transaction(async (tx) => {
-  //       const submission = await tx.submission.create({
-  //         data: {
-  //           formTemplateSlug: createLeadDto.templateSlug,
-  //           answers: createLeadDto.answers,
-  //         },
-  //       });
-
-  //       const lead = await tx.lead.create({
-  //         data: {
-  //           name: createLeadDto.name,
-  //           job: createLeadDto.job,
-  //           phone: createLeadDto.phone,
-  //           submissionId: submission.id,
-  //         },
-  //       });
-
-  //       return lead;
-  //     });
-
-  //     return result;
-  //   } catch (error: any) {
-  //     if (error.code === 'P2002') {
-  //       throw new ConflictException('تم التسجيل مسبقًا بهذا الرقم');
-  //     }
-  //     throw error;
-  //   }
-  // }
   async create(createLeadDto: CreateLeadDto) {
     const phoneExists = await this.prisma.lead.findUnique({
       where: { phone: createLeadDto.phone },
@@ -212,7 +174,7 @@ export class LeadService {
     const [leads, total] = await this.prisma.$transaction([
       this.prisma.lead.findMany({
         skip,
-        take: limits,
+        take: parseFloat(limits.toString()),
         orderBy: {
           createdAt: orders,
         },
@@ -230,6 +192,78 @@ export class LeadService {
         pages,
         lastPage: Math.ceil(total / limits),
       },
+    };
+  }
+
+  async exportLeadsToExcelOrCSV(reply: FastifyReply, exporter: string) {
+    const leads = await this.prisma.lead.findMany({
+      select: {
+        name: true,
+        job: true,
+        phone: true,
+        status: true,
+      },
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(leads);
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+
+    if (exporter === ExportFileExtension.CSV) {
+      const csv = XLSX.utils.sheet_to_csv(worksheet);
+
+      return reply
+        .header('Content-Type', 'text/csv; charset=utf-8')
+        .header('Content-Disposition', 'attachment; filename="leads.csv"')
+        .send(Buffer.from('\uFEFF' + csv, 'utf8'));
+    }
+
+    const buffer = XLSX.write(workbook, {
+      type: 'buffer',
+      bookType: 'xlsx',
+    });
+
+    return reply
+      .header(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      )
+      .header('Content-Disposition', 'attachment; filename="leads.xlsx"')
+      .send(buffer);
+  }
+
+  async updateStatus(reply: FastifyReply, updateStatusDto: UpdateStatusDto) {
+    const { id, status } = updateStatusDto;
+
+    const lead = await this.prisma.lead.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const updatedLead = await this.prisma.lead.update({
+      where: {
+        id,
+      },
+      data: {
+        status: status as LeadStatus,
+      },
+    });
+
+    const getLeads = await this.prisma.lead.findMany({});
+
+    await this.redis.del('leads');
+    await this.redis.set('leads', JSON.stringify(getLeads));
+
+    return {
+      status: 'success',
+      data: updatedLead,
     };
   }
 }

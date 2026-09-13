@@ -1,12 +1,13 @@
 import { Module, ValidationPipe } from '@nestjs/common';
-import { PrismaModule } from './modules/prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { RedisModule } from './modules/redis/redis.module.js';
+import { PrismaService } from './modules/prisma/prisma.service.js';
+import { PrismaModule } from './modules/prisma/prisma.module.js';
 import { APP_PIPE } from '@nestjs/core';
-import { MailModule } from './modules/mail/mail.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { RedisModule } from './modules/redis/redis.module';
-import { TemplateModule } from './modules/template/template.module';
-import { LeadModule } from './modules/lead/lead.module';
+import { LeadModule } from './modules/lead/lead.module.js';
+import { TemplateModule } from './modules/template/template.module.js';
+import { TokenService } from './modules/auth/stratgies/token.service.js';
 
 @Module({
   imports: [
@@ -14,13 +15,14 @@ import { LeadModule } from './modules/lead/lead.module';
       isGlobal: true,
     }),
     RedisModule,
-    MailModule,
-    PrismaModule,
     AuthModule,
-    TemplateModule,
+    PrismaModule,
     LeadModule,
+    TemplateModule,
   ],
+  controllers: [],
   providers: [
+    PrismaService,
     {
       provide: APP_PIPE,
       useClass: ValidationPipe,
