@@ -12,6 +12,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import * as XLSX from 'xlsx';
 import { UpdateStatusDto } from './dto/update-status.dto.js';
 import { LeadStatus } from '../../generated/prisma/enums.js';
+import { MetaService } from './stratgies/meta.service.js';
 
 enum ExportFileExtension {
   XLSX = 'xlsx',
@@ -22,6 +23,7 @@ enum ExportFileExtension {
 export class LeadService {
   constructor(
     private prisma: PrismaService,
+    private metaService: MetaService,
     @InjectRedisClient() private redis: Redis,
   ) {}
 
@@ -155,6 +157,7 @@ export class LeadService {
         return lead;
       });
 
+      await this.metaService.sendLeadEvent(result);
       return result;
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -255,6 +258,14 @@ export class LeadService {
         status: status as LeadStatus,
       },
     });
+
+    if (updatedLead.status === LeadStatus.QUALIFIED) {
+      await this.metaService.sendQualifiedLeadEvent({
+        name: updatedLead.name,
+        phone: updatedLead.phone,
+        job: updatedLead.job,
+      });
+    }
 
     const getLeads = await this.prisma.lead.findMany({});
 
